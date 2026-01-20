@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { db } from "../firebase";
-import { doc, getDoc, updateDoc, collection, query, orderBy, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, updateDoc, setDoc, collection, query, orderBy, onSnapshot } from "firebase/firestore";
 import { uploadToCloudinary } from "../utils/cloudinary";
 
 export default function Profile() {
@@ -65,7 +65,7 @@ export default function Profile() {
         downloadURL = await uploadToCloudinary(resumeFile);
       }
 
-      await updateDoc(doc(db, "users", currentUser.uid), {
+      await setDoc(doc(db, "users", currentUser.uid), {
         displayName: profileData.displayName,
         collegeName: profileData.collegeName,
         skills: profileData.skills.split(",").map(s => s.trim()).filter(Boolean),
@@ -73,7 +73,7 @@ export default function Profile() {
         linkedinUrl: profileData.linkedinUrl,
         githubUrl: profileData.githubUrl,
         resumeUrl: downloadURL
-      });
+      }, { merge: true });
       
       setProfileData(prev => ({...prev, resumeUrl: downloadURL}));
       setMessage("Profile updated successfully!");

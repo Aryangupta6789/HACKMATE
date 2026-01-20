@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { db } from "../firebase";
-import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, collection, addDoc, query, where, getDocs, onSnapshot, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, updateDoc, deleteDoc, arrayUnion, arrayRemove, collection, addDoc, query, where, getDocs, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { sendNotification } from "../utils/notifications";
 import { useAuth } from "../contexts/AuthContext";
 import Chat from "../components/Chat";
@@ -10,6 +10,7 @@ import HonorVoting from "../components/HonorVoting";
 
 export default function TeamDetails() {
     const { teamId } = useParams();
+    const navigate = useNavigate();
     const { currentUser } = useAuth();
     const [team, setTeam] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -132,6 +133,30 @@ export default function TeamDetails() {
         }
     }
 
+    async function handleCloseRecruitment() {
+        if (!window.confirm("Are you sure you want to close recruitment? This will move the team to 'Past Teams'.")) return;
+        try {
+            await updateDoc(doc(db, "teams", teamId), {
+                status: "Closed"
+            });
+            // No need to redirect, just stays on page, but status updates via snapshot
+        } catch (error) {
+            console.error("Error closing recruitment:", error);
+            alert("Failed to close recruitment");
+        }
+    }
+
+    async function handleDeleteTeam() {
+        if (!window.confirm("Are you sure you want to DELETE this team? This action cannot be undone.")) return;
+        try {
+            await deleteDoc(doc(db, "teams", teamId));
+            navigate("/my-teams");
+        } catch (error) {
+            console.error("Error deleting team:", error);
+            alert("Failed to delete team");
+        }
+    }
+
     if (loading) return <div>Loading...</div>;
     if (!team) return <div>Team not found</div>;
 
@@ -231,49 +256,74 @@ export default function TeamDetails() {
                     </div>
                 )}
 
-                {/* Applicant Management (Owner Only) */}
-                {isOwner && (
-                    <div className="glass-panel p-6 rounded-2xl">
-                        <h3 className="font-bold text-white mb-4 flex items-center gap-2">
-                            Pending Applications
-                            {applicants.length > 0 && <span className="bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full">{applicants.length}</span>}
-                        </h3>
-                        {applicants.length === 0 ? (
-                            <p className="text-slate-400 text-sm">No pending applications yet.</p>
-                        ) : (
-                            <div className="space-y-4">
-                                {applicants.map(applicant => (
-                                    <div key={applicant.uid} className="glass-card p-4 rounded-xl">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <span className="font-bold text-white">{applicant.displayName}</span>
-                                            <span className="text-xs text-yellow-500 font-bold border border-yellow-500/20 px-1.5 py-0.5 rounded bg-yellow-500/10">Score: {applicant.honorScore}</span>
-                                        </div>
-                                        <p className="text-slate-400 text-sm mb-3">Skills: {Array.isArray(applicant.skills) ? applicant.skills.join(", ") : applicant.skills}</p>
-                                        <div className="flex gap-3 text-sm mb-4">
-                                            {applicant.resumeUrl && (
-                                                <a href={applicant.resumeUrl} target="_blank" className="text-blue-400 hover:text-blue-300 font-medium">View Resume</a>
-                                            )}
-                                            {applicant.linkedinUrl && (
-                                                <a href={applicant.linkedinUrl} target="_blank" className="text-blue-400 hover:text-blue-300 font-medium">LinkedIn</a>
-                                            )}
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={() => handleAccept(applicant.uid)}
-                                                className="flex-1 bg-green-600 hover:bg-green-500 text-white py-2 rounded-lg text-sm font-bold transition-colors shadow-lg shadow-green-900/20"
-                                            >
-                                                Accept
-                                            </button>
-                                            <button className="flex-1 bg-slate-700/50 hover:bg-slate-700 text-white py-2 rounded-lg text-sm font-medium transition-colors border border-white/5">
-                                                Ignore
-                                            </button>
-                                        </div>
+                    <div className="space-y-6">
+                         {/* Admin Actions (Owner Only) */}
+                        {isOwner && (
+                            <div className="glass-panel p-6 rounded-2xl border border-red-500/10">
+                                <h3 className="font-bold text-white mb-4">Team Management</h3>
+                                <div className="space-y-3">
+                                    {team.status === 'Open' && (
+                                        <button 
+                                            onClick={handleCloseRecruitment}
+                                            className="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 py-3 rounded-xl font-bold transition-all border border-white/5"
+                                        >
+                                            Close Recruitment
+                                        </button>
+                                    )}
+                                    <button 
+                                        onClick={handleDeleteTeam}
+                                        className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-400 py-3 rounded-xl font-bold transition-all border border-red-500/20"
+                                    >
+                                        Delete Team
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Applicant Management (Owner Only) */}
+                        {isOwner && (
+                            <div className="glass-panel p-6 rounded-2xl">
+                                <h3 className="font-bold text-white mb-4 flex items-center gap-2">
+                                    Pending Applications
+                                    {applicants.length > 0 && <span className="bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full">{applicants.length}</span>}
+                                </h3>
+                                {applicants.length === 0 ? (
+                                    <p className="text-slate-400 text-sm">No pending applications yet.</p>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {applicants.map(applicant => (
+                                            <div key={applicant.uid} className="glass-card p-4 rounded-xl">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <span className="font-bold text-white">{applicant.displayName}</span>
+                                                    <span className="text-xs text-yellow-500 font-bold border border-yellow-500/20 px-1.5 py-0.5 rounded bg-yellow-500/10">Score: {applicant.honorScore}</span>
+                                                </div>
+                                                <p className="text-slate-400 text-sm mb-3">Skills: {Array.isArray(applicant.skills) ? applicant.skills.join(", ") : applicant.skills}</p>
+                                                <div className="flex gap-3 text-sm mb-4">
+                                                    {applicant.resumeUrl && (
+                                                        <a href={applicant.resumeUrl} target="_blank" className="text-blue-400 hover:text-blue-300 font-medium">View Resume</a>
+                                                    )}
+                                                    {applicant.linkedinUrl && (
+                                                        <a href={applicant.linkedinUrl} target="_blank" className="text-blue-400 hover:text-blue-300 font-medium">LinkedIn</a>
+                                                    )}
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => handleAccept(applicant.uid)}
+                                                        className="flex-1 bg-green-600 hover:bg-green-500 text-white py-2 rounded-lg text-sm font-bold transition-colors shadow-lg shadow-green-900/20"
+                                                    >
+                                                        Accept
+                                                    </button>
+                                                    <button className="flex-1 bg-slate-700/50 hover:bg-slate-700 text-white py-2 rounded-lg text-sm font-medium transition-colors border border-white/5">
+                                                        Ignore
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
+                                )}
                             </div>
                         )}
                     </div>
-                )}
             </div>
         </div>
     );

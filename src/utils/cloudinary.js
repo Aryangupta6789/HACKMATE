@@ -8,7 +8,7 @@ export const uploadToCloudinary = async (file) => {
 
   const formData = new FormData();
   formData.append("file", file);
-  const resourceType = file.type === "application/pdf" ? "raw" : "auto";
+  const resourceType = file.type === "application/pdf" ? "image" : "auto";
   formData.append("upload_preset", uploadPreset);
   
   console.log(`Starting upload as ${resourceType}...`, { cloudName: cloudName ? "Present" : "Missing", preset: uploadPreset ? "Present" : "Missing" });
